@@ -8,7 +8,7 @@
 
 import UIKit
 
-class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewDelegate
+class DetailViewController:UIViewController, UIScrollViewDelegate, UITextFieldDelegate {
     
     @IBOutlet weak var saveButton: UIBarButtonItem!
     @IBOutlet weak var cancelButton: UIBarButtonItem!
@@ -68,13 +68,18 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
     var scrollViewInnerViewHeight:CGFloat = 0
     
     var contact: Contact?
-    
     var i:Int = 0
+    var navigationBarHeight:CGFloat = 0
+    var activeTextField:UITextField? = nil
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         self.scrollView.delegate = self
+        
+        firstNameTextField.delegate = self
+        lastNameTextField.delegate = self
+        dobTextField.delegate = self
         
         phoneNumbersStackHeight.constant = CGFloat(phoneNumbers.count * phoneNumberViewsHeight)
         addressesStackHeight.constant = CGFloat(addresses.count * addressViewsHeight)
@@ -84,7 +89,11 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        scrollViewInnerView.frame = CGRect(x: scrollViewInnerView.frame.minX, y: scrollViewInnerView.frame.minY, width: scrollViewInnerView.frame.width, height: scrollViewInnerView.frame.height - 64)//adjust for navigation area
+        addKeyboardObservers()
+        
+        navigationBarHeight = self.navigationController!.navigationBar.frame.height + UIApplication.shared.statusBarFrame.height
+        
+        scrollViewInnerView.frame = CGRect(x: scrollViewInnerView.frame.minX, y: scrollViewInnerView.frame.minY, width: scrollViewInnerView.frame.width, height: scrollViewInnerView.frame.height - navigationBarHeight)//adjust for navigation area
         scrollView.contentSize = scrollViewInnerView.frame.size
         
         scrollViewInnerViewHeightOriginal = scrollViewInnerView.frame.height
@@ -125,6 +134,12 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
      
     }
     
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        
+        removeKeyboardObservers()
+    }
+    
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         
@@ -138,8 +153,11 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
         }
     }
     
+    //called after orientation change
     override func viewDidLayoutSubviews() {
-        //called after orientation change
+        //set correct nav bar height
+        navigationBarHeight = self.navigationController!.navigationBar.frame.height + UIApplication.shared.statusBarFrame.height
+        
         //bug fix for UI to scroll through all dynamic fields after orientation change
         if scrollViewInnerViewHeight > 0 {
             DispatchQueue.main.async {
@@ -229,7 +247,7 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
         
         if !validated {
             DispatchQueue.main.async {
-                self.scrollView.contentOffset = CGPoint(x: 0, y: -64)//adjusted for navigation area
+                self.scrollView.contentOffset = CGPoint(x: 0, y: -self.navigationBarHeight)//adjusted for navigation area
             }
             
             return false
@@ -472,6 +490,53 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
     
     
     
+    //keyboard alterations
+    func addKeyboardObservers() {
+        removeKeyboardObservers()//to avoid duplicates
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(DetailViewController.keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(DetailViewController.keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    func removeKeyboardObservers() {
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    @objc func keyboardWillShow(notification: NSNotification) {
+        if let keyboardSize = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue {
+            
+            if scrollViewInnerView.frame.origin.y == 0{
+                //get absolute position relative to window
+                let activeTextFieldAbsolutePos = (self.activeTextField?.superview?.convert((self.activeTextField?.frame.origin)!, to: nil).y)! - navigationBarHeight//adjust for navigation area
+                
+                if(activeTextFieldAbsolutePos - keyboardSize.height) > 0 {
+                    scrollViewInnerView.frame.origin.y -= keyboardSize.height
+                }
+            }
+        }
+    }
+    
+    @objc func keyboardWillHide(notification: NSNotification) {
+        if ((notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue) != nil {
+            if scrollViewInnerView.frame.origin.y != 0{
+                scrollViewInnerView.frame.origin.y = 0
+            }
+        }
+    }
+    
+    func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
+        self.activeTextField = textField
+        return true
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
+        return true
+    }
+    
+    
+    
     @IBAction func addPhoneNumberButtonAction(_ sender: UIButton) {
         let yPos = phoneNumbers.count * phoneNumberViewsHeight
         let view = UIView(frame: CGRect(x: 0, y: yPos, width: phoneNumberViewsWidth, height: phoneNumberViewsHeight))
@@ -487,6 +552,8 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
         let textField = UITextField(frame: CGRect(x: phoneNumberViewsButtonWidth, y: 1, width: phoneNumberViewsWidth - phoneNumberViewsButtonWidth, height: phoneNumberViewsHeight))
         textField.placeholder = phoneNumberViewsPlaceholder
         textField.adjustsFontSizeToFitWidth = true
+        textField.returnKeyType = .done
+        textField.delegate = self
         view.insertSubview(textField, at: phoneNumbers.count)
         
         phoneNumbers.append(textField)
@@ -510,6 +577,8 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
         textField.placeholder = emailViewsPlaceholder
         textField.adjustsFontSizeToFitWidth = true
         textField.autocapitalizationType = .none
+        textField.returnKeyType = .done
+        textField.delegate = self
         view.insertSubview(textField, at: emails.count)
         
         emails.append(textField)
@@ -541,17 +610,23 @@ class DetailViewController:UIViewController, UIScrollViewDelegate {//UITextViewD
         textFieldStreet.placeholder = streetPlaceholder
         textFieldStreet.adjustsFontSizeToFitWidth = true
         textFieldStreet.autocapitalizationType = .words
+        textFieldStreet.returnKeyType = .done
+        textFieldStreet.delegate = self
         innerView.addSubview(textFieldStreet)
         
         let textFieldCityState = UITextField(frame: CGRect(x: 0, y: innerView.frame.height / 2, width: (innerView.frame.width / 3) * 2, height: innerView.frame.height / 2))
         textFieldCityState.placeholder = cityStatePlaceholder
         textFieldCityState.adjustsFontSizeToFitWidth = true
         textFieldCityState.autocapitalizationType = .words
+        textFieldCityState.returnKeyType = .done
+        textFieldCityState.delegate = self
         innerView.addSubview(textFieldCityState)
         
         let textFieldZip = UITextField(frame: CGRect(x: (innerView.frame.width / 3) * 2, y: innerView.frame.height / 2, width: (innerView.frame.width / 3), height: innerView.frame.height / 2))
         textFieldZip.placeholder = zipPlaceholder
         textFieldZip.adjustsFontSizeToFitWidth = true
+        textFieldZip.returnKeyType = .done
+        textFieldZip.delegate = self
         innerView.addSubview(textFieldZip)
         
         view.insertSubview(innerView, at: addresses.count)
