@@ -156,7 +156,9 @@ class DetailViewController:UIViewController, UIScrollViewDelegate, UITextFieldDe
     //called after orientation change
     override func viewDidLayoutSubviews() {
         //set correct nav bar height
-        navigationBarHeight = self.navigationController!.navigationBar.frame.height + UIApplication.shared.statusBarFrame.height
+        if self.navigationController != nil {
+            navigationBarHeight = self.navigationController!.navigationBar.frame.height + UIApplication.shared.statusBarFrame.height
+        }
         
         //bug fix for UI to scroll through all dynamic fields after orientation change
         if scrollViewInnerViewHeight > 0 {
@@ -247,6 +249,9 @@ class DetailViewController:UIViewController, UIScrollViewDelegate, UITextFieldDe
         
         if !validated {
             DispatchQueue.main.async {
+                if self.activeTextField != nil {
+                    self.activeTextField?.resignFirstResponder()
+                }
                 self.scrollView.contentOffset = CGPoint(x: 0, y: -self.navigationBarHeight)//adjusted for navigation area
             }
             
