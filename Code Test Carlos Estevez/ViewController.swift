@@ -143,6 +143,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
             for (index, filteredContact) in (filteredContacts?.enumerated())! {
                 if filteredContact.id == contact?.id {
                     filteredContacts![index] = contact!
+                    filteredContacts = filteredContacts!.sorted(by: { $0.fullName < $1.fullName })
                     break
                 }
             }
