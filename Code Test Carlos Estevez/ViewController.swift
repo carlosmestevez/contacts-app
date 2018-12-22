@@ -49,6 +49,14 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         self.contactsTableView.reloadData()
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        if let index = self.contactsTableView.indexPathForSelectedRow{
+            self.contactsTableView.deselectRow(at: index, animated: true)
+        }
+    }
+    
     override func setEditing(_ editing: Bool, animated: Bool) {
         if (editing && !contactsTableView.isEditing) {
             contactsTableView.setEditing(true, animated: true)
@@ -112,8 +120,22 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
     
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
-            contacts.remove(at: indexPath.row)
-            filteredContacts!.remove(at: indexPath.row)
+            var contact:Contact? = nil
+            if searchController.searchBar.text! == "" {
+                contact = contacts[indexPath.row]
+            } else {
+                contact = filteredContacts![indexPath.row]
+            }
+            
+            contacts.remove(at: (contact?.id)!)
+            
+            for (index, filteredContact) in (filteredContacts?.enumerated())! {
+                if filteredContact.id == contact?.id {
+                    filteredContacts!.remove(at: index)
+                    break
+                }
+            }
+            
             saveData()
             contactsTableView.reloadData()
         }
